@@ -3,13 +3,18 @@ import { Store } from './database.js';
 import { ConnectorError, authenticate, configuration, fail, readJson } from './security.js';
 import { beginOAuth, callback, disconnect } from './oauth.js';
 import { handleMcp } from './mcp.js';
+import { handleModernMcp, isModernRequest, MODERN_VERSION, SUPPORTED_VERSIONS } from './mcp-modern.js';
+import { dashboardHtml, dashboardScript } from './dashboard.js';
 
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
 const json = (value, status = 200, headers = {}) => new Response(JSON.stringify(value), { status, headers: { ...JSON_HEADERS, ...headers } });
 function protect(response, request, env) {
   const headers = new Headers(response.headers);
   headers.set('x-content-type-options', 'nosniff');
-  headers.set('content-security-policy', "default-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+  headers.set('content-security-policy', response.headers.get('content-type')?.startsWith('text/html')
+    ? "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+    : "default-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+  headers.set('permissions-policy', 'camera=(), geolocation=(), microphone=(self)');
   headers.set('referrer-policy', 'no-referrer');
   headers.set('cache-control', 'no-store');
   headers.set('strict-transport-security', 'max-age=31536000');
@@ -17,7 +22,7 @@ function protect(response, request, env) {
     headers.set('access-control-allow-origin', env.APP_ORIGIN);
     headers.set('vary', 'Origin');
     headers.set('access-control-allow-methods', 'GET, POST, OPTIONS');
-    headers.set('access-control-allow-headers', 'Authorization, Content-Type, Accept, MCP-Protocol-Version');
+    headers.set('access-control-allow-headers', 'Authorization, Content-Type, Accept, MCP-Protocol-Version, Mcp-Method, Mcp-Name');
     headers.set('access-control-expose-headers', 'WWW-Authenticate');
   }
   return new Response(response.body, { status: response.status, headers });
@@ -46,9 +51,20 @@ export function createWorker(dependencies = {}) {
 }
 async function route(request, env, deps) {
   const url = new URL(request.url);
+  if (request.method === 'GET' && url.pathname === '/') return new Response(dashboardHtml, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+  if (request.method === 'GET' && url.pathname === '/ui/app.js') return new Response(dashboardScript, { headers: { 'content-type': 'text/javascript; charset=utf-8' } });
+  if (request.method === 'GET' && url.pathname === '/api/status') return json({
+    environment: env.ENVIRONMENT === 'production' ? 'production-config' : 'development',
+    productionReady: false, writesEnabled: false,
+    databaseConfigured: Boolean(env.DATABASE_URL), readConfigurationPresent: configuration(env).ok,
+    googleOAuthConfigured: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REDIRECT_URI),
+    mcpAuthConfigured: Boolean(env.MCP_AUTH_ISSUER && env.MCP_AUTH_AUDIENCE && env.MCP_AUTH_JWKS_URL),
+    supportedProtocolVersions: SUPPORTED_VERSIONS, budgetReadOptIn: env.ENABLE_BUDGET_READ === 'true',
+    voice: { mode: 'browser-optional', automaticExecution: false }, humanApprovalExecutor: 'disabled'
+  });
   if (url.pathname === '/health' && request.method === 'GET') return json({
     ok: true, service: 'google-cloud-connector', stage: 'development-read-only', productionReady: false,
-    writesEnabled: false, voiceImplemented: false
+    writesEnabled: false, voiceImplemented: true, voiceMode: 'browser-optional'
   });
   const config = configuration(env);
   if (url.pathname === '/ready' && request.method === 'GET') {
@@ -86,10 +102,17 @@ async function route(request, env, deps) {
   }
   if (url.pathname === '/mcp') {
     if (request.method !== 'POST') return json({ error: { code: 'METHOD_NOT_ALLOWED' } }, 405, { allow: 'POST' });
-    const body = await readJson(request);
+    let body;
+    try { body = await readJson(request); }
+    catch (error) {
+      if (request.headers.get('mcp-protocol-version') === MODERN_VERSION && error instanceof ConnectorError && error.code === 'INVALID_JSON') {
+        return json({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' } }, 400);
+      }
+      throw error;
+    }
+    if (isModernRequest(request, body)) return handleModernMcp(request, body, user, env, store);
     if (Array.isArray(body) || !body || typeof body !== 'object') fail('INVALID_MCP_MESSAGE', 400);
-    // SDK 1.32.2 supports initialization-based protocol revisions through 2025-11-25.
-    // Do not claim native support for the newer 2026 request-metadata protocol.
+    // Legacy initialization-era clients continue through the official SDK.
     const version = request.headers.get('mcp-protocol-version');
     if (version && !['2025-11-25', '2025-06-18', '2025-03-26'].includes(version)) fail('UNSUPPORTED_MCP_PROTOCOL', 400);
     if (body.method === 'initialize' && !['2025-11-25', '2025-06-18', '2025-03-26'].includes(body.params?.protocolVersion)) fail('UNSUPPORTED_MCP_PROTOCOL', 400);

@@ -8,6 +8,7 @@ node_modules/
 .DS_Store
 coverage/
 dist/
+dist-dev/
 *.log
 *.backup
 *.bak

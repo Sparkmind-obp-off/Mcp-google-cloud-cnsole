@@ -2,6 +2,8 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { decrypt, encrypt, fail, random, sha256 } from './security.js';
 
 export const READ_SCOPE = 'https://www.googleapis.com/auth/cloud-platform.read-only';
+// Google's Budgets API does not accept cloud-platform.read-only. Explicit opt-in is required.
+export const BILLING_SCOPE = 'https://www.googleapis.com/auth/cloud-billing';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const COOKIE = '__Host-gcp_oauth';
 const cookieHeader = value => `${COOKIE}=${value}; Path=/; Max-Age=${value ? 600 : 0}; Secure; HttpOnly; SameSite=Lax`;
@@ -24,7 +26,7 @@ export async function beginOAuth(user, env, store) {
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   url.search = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID, redirect_uri: env.GOOGLE_REDIRECT_URI, response_type: 'code',
-    scope: `openid email ${READ_SCOPE}`, access_type: 'offline', prompt: 'consent',
+    scope: `openid email ${READ_SCOPE}${env.ENABLE_BUDGET_READ === 'true' ? ` ${BILLING_SCOPE}` : ''}`, access_type: 'offline', prompt: 'consent',
     state, nonce, code_challenge: await sha256(verifier), code_challenge_method: 'S256'
   }).toString();
   return { authorizationUrl: url.toString(), cookie: cookieHeader(browser) };

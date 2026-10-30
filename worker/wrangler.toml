@@ -20,3 +20,7 @@ invocation_logs = false
 name = "google-cloud-connector-development"
 [env.development.vars]
 ENVIRONMENT = "development"
+APP_ORIGIN = "https://google-cloud-connector-development.sparkmind-support.workers.dev"
+GOOGLE_REDIRECT_URI = "https://google-cloud-connector-development.sparkmind-support.workers.dev/oauth/google/callback"
+MCP_AUTH_AUDIENCE = "https://google-cloud-connector-development.sparkmind-support.workers.dev/mcp"
+ENABLE_BUDGET_READ = "false"

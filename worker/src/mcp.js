@@ -5,14 +5,14 @@ import { ConnectorError } from './security.js';
 import { readTools, invokeRead, googleRequest, sanitize } from './tools.js';
 import { accessToken } from './oauth.js';
 
-export async function handleMcp(request, body, user, env, store) {
-  const server = new McpServer({ name: 'google-cloud-console-connector', version: '0.2.0' });
+export const SERVER_INFO = { name: 'google-cloud-console-connector', version: '0.3.0' };
+export const READ_ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true };
+export function createToolRegistry(user, env, store) {
+  const registry = new Map();
   function register(name, description, schema, callback) {
-    server.registerTool(name, {
-      description, inputSchema: schema,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
-    }, async args => {
+    registry.set(name, { name, description, schema, annotations: READ_ANNOTATIONS, invoke: async input => {
       try {
+        const args = schema.parse(input);
         const value = await callback(args);
         const structuredContent = { data: value };
         return { content: [{ type: 'text', text: JSON.stringify(structuredContent) }], structuredContent };
@@ -21,7 +21,7 @@ export async function handleMcp(request, body, user, env, store) {
         await store.security(user.id, code);
         return { content: [{ type: 'text', text: JSON.stringify({ error: { code } }) }], isError: true };
       }
-    });
+    } });
   }
   register('gcp_get_connection_status', 'List only your own Google connections; never returns tokens.', z.strictObject({}), () => store.connections(user.id));
   register('gcp_list_authorized_projects', 'List connector project grants for this connection. Grants do not imply Google IAM permissions.', z.strictObject({ connectionId: z.uuid() }), async a => {
@@ -39,6 +39,13 @@ export async function handleMcp(request, body, user, env, store) {
   });
   for (const tool of readTools) register(tool.name, tool.description, tool.schema, a => invokeRead(tool, a, user, env, store));
   // No approval/execute tools: an AI client must not self-approve a mutation.
+  return registry;
+}
+export async function handleMcp(request, body, user, env, store) {
+  const server = new McpServer(SERVER_INFO);
+  for (const tool of createToolRegistry(user, env, store).values()) {
+    server.registerTool(tool.name, { description: tool.description, inputSchema: tool.schema, annotations: tool.annotations }, args => tool.invoke(args));
+  }
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true, maxRequestBodySize: 32768 });
   await server.connect(transport);
   try { return await transport.handleRequest(request, { parsedBody: body }); }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { accessToken } from './oauth.js';
+import { accessToken, BILLING_SCOPE } from './oauth.js';
 import { fail } from './security.js';
 
 const connectionId = z.uuid();
@@ -50,7 +50,9 @@ export const readTools = [
     }
   }),
   definition('gcp_get_billing_info', 'Read project billing association. Budget and billing account modifications are not supported.', base,
-    'cloudbilling.googleapis.com', 'resourcemanager.projects.get', a => `/v1/projects/${a.projectId}/billingInfo`)
+    'cloudbilling.googleapis.com', 'resourcemanager.projects.get', a => `/v1/projects/${a.projectId}/billingInfo`),
+  definition('gcp_list_billing_budgets', 'Read budgets explicitly scoped to the selected project. Requires opt-in, cloud-billing OAuth scope, billing.budgets.list and project billing association access; never modifies budgets.', { ...base, ...page },
+    'billingbudgets.googleapis.com', 'billing.budgets.list', () => '', { budgetRead: true })
 ];
 // Do not send instance metadata, env values, SQL user data or raw log payloads to clients.
 export function sanitize(value, depth = 0) {
@@ -92,9 +94,29 @@ export async function googleRequest(api, path, token, options = {}, fetcher = fe
 export async function invokeRead(tool, input, user, env, store, fetcher = fetch) {
   const args = tool.schema.parse(input);
   await store.project(user.id, args.connectionId, args.projectId);
+  if (tool.budgetRead) {
+    if (env.ENABLE_BUDGET_READ !== 'true') fail('BUDGET_READ_NOT_ENABLED', 403);
+    const connection = await store.connection(user.id, args.connectionId);
+    if (!connection.scopes.includes(BILLING_SCOPE)) fail('BILLING_SCOPE_REQUIRED', 403);
+  }
   const token = await accessToken(user, args.connectionId, env, store, fetcher);
   const options = { method: tool.method, body: tool.body?.(args) };
-  const data = await googleRequest(tool.api, tool.path(args), token, options, fetcher);
+  let data;
+  if (tool.budgetRead) {
+    // Refresh may narrow the stored grant. Recheck before making a billing request.
+    if (!(await store.connection(user.id, args.connectionId)).scopes.includes(BILLING_SCOPE)) fail('BILLING_SCOPE_REQUIRED', 403);
+    const association = await googleRequest('cloudbilling.googleapis.com', `/v1/projects/${args.projectId}/billingInfo`, token, {}, fetcher);
+    if (!/^billingAccounts\/[A-F0-9]{6}-[A-F0-9]{6}-[A-F0-9]{6}$/.test(association.billingAccountName || '')) fail('BILLING_ACCOUNT_UNAVAILABLE', 403);
+    const project = await googleRequest('cloudresourcemanager.googleapis.com', `/v3/projects/${args.projectId}`, token, {}, fetcher);
+    if (!/^projects\/[0-9]+$/.test(project.name || '')) fail('GOOGLE_INVALID_RESPONSE', 502);
+    const params = query({ scope: `projects/${args.projectId}`, pageSize: args.pageSize, pageToken: args.pageToken });
+    data = await googleRequest(tool.api, `/v1/${association.billingAccountName}/budgets${params}`, token, {}, fetcher);
+    const selected = new Set([`projects/${args.projectId}`, project.name]);
+    // Exclude account-wide/mixed-project totals to avoid leaking another project's spend.
+    data = { ...data, budgets: (data.budgets || []).filter(b => Array.isArray(b.budgetFilter?.projects) && b.budgetFilter.projects.length > 0 && b.budgetFilter.projects.every(p => selected.has(p))) };
+  } else {
+    data = await googleRequest(tool.api, tool.path(args), token, options, fetcher);
+  }
   if (tool.bucketCheck) {
     const project = await googleRequest('cloudresourcemanager.googleapis.com', `/v3/projects/${args.projectId}`, token, {}, fetcher);
     if (!project.name || !data.projectNumber || String(data.projectNumber) !== project.name.replace('projects/', '')) fail('BUCKET_PROJECT_MISMATCH', 403);

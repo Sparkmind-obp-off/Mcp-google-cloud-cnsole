@@ -1,11 +1,12 @@
 {
   "name": "google-cloud-console-connector",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1 tests/*.test.js",
     "build": "wrangler deploy --config worker/wrangler.toml --env='' --dry-run --outdir dist",
+    "build:development": "wrangler deploy --config worker/wrangler.toml --env development --dry-run --outdir dist-dev",
     "dev:sandbox": "wrangler dev --config worker/wrangler.toml --local --ip 0.0.0.0 --port 3000",
     "db:check": "node scripts/database.js check",
     "db:migrate": "node scripts/database.js migrate",
