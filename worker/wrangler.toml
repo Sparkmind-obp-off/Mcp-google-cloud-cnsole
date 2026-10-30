@@ -1,0 +1,12 @@
+name = "google-cloud-connector"
+main = "src/index.js"
+compatibility_date = "2026-10-30"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "google-cloud-connector"
+database_id = "REPLACE_AFTER_CREATING_D1"
+
+[vars]
+APP_ORIGIN = "https://REPLACE-WITH-WORKER-DOMAIN"
+GOOGLE_REDIRECT_URI = "https://REPLACE-WITH-WORKER-DOMAIN/oauth/google/callback"
