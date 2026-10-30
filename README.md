@@ -13,6 +13,22 @@ Cloudflare Pages frontend + Pages Functions UI layer, dedicated Cloudflare Worke
 
 The current 0.3.0 development deployment still serves its existing dashboard from the Worker. Pages extraction is a documented next milestone, not a completed deployment. See [system architecture](docs/SYSTEM-ARCHITECTURE.md), [frontend/UI](docs/FRONTEND-AND-UX.md), [backend/MCP](docs/BACKEND-MCP-SPEC.md), [database](docs/DATABASE-DESIGN.md), [product/North Star](docs/PRODUCT-AND-NORTH-STAR.md), [MVP roadmap](docs/MVP-AND-ROADMAP.md) and [technical blueprint](docs/TECHNICAL-MVP-BLUEPRINT.md).
 
+## Complete documentation set
+
+- [Product and North Star](docs/PRODUCT-AND-NORTH-STAR.md)
+- [System architecture](docs/SYSTEM-ARCHITECTURE.md)
+- [Frontend and UI/UX](docs/FRONTEND-AND-UX.md)
+- [Backend and MCP specification](docs/BACKEND-MCP-SPEC.md)
+- [Database design](docs/DATABASE-DESIGN.md)
+- [Access control and OAuth](docs/ACCESS-CONTROL-AND-OAUTH.md)
+- [Threat model and security](docs/THREAT-MODEL.md)
+- [MVP and roadmap](docs/MVP-AND-ROADMAP.md)
+- [Technical MVP blueprint](docs/TECHNICAL-MVP-BLUEPRINT.md)
+- [Test plan and acceptance](docs/TEST-PLAN-AND-ACCEPTANCE.md)
+- [Operations and recovery](docs/OPERATIONS-AND-RECOVERY.md)
+- [Master System Prompt — Google Cloud Operator](docs/MASTER-SYSTEM-PROMPT.md)
+- [ChatGPT custom MCP setup](docs/CHATGPT-DIRECT-MCP-SETUP.md)
+
 ## URLs and GitHub
 
 - **Development Worker**: https://google-cloud-connector-development.sparkmind-support.workers.dev
