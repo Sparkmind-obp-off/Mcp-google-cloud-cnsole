@@ -1,58 +1,30 @@
 # Access control and OAuth integration contract
 
-Status: implementation contract. Values and endpoints must be configured and verified per environment; this document does not assert live OAuth readiness.
+Two independent authorization boundaries are mandatory.
 
-## Two independent authorization boundaries
+## ChatGPT/client → MCP backend
+- Use an OAuth authorization server compatible with the actual ChatGPT custom MCP flow.
+- Publish protected-resource and authorization-server discovery metadata.
+- Support refresh/offline access where required; verify refresh tokens are issued, not merely advertised.
+- Validate JWT signature, issuer, audience/resource, expiry, nbf, scope and registered subject on every call.
+- Never accept Google access/refresh/ID tokens as MCP bearer credentials.
 
-### A. ChatGPT/client → MCP backend
-Purpose: authorize the MCP client to call this connector.
-- Use an OAuth authorization server compatible with the exact ChatGPT custom MCP flow.
-- Publish standards-compliant authorization-server and protected-resource metadata.
-- Advertise and issue refresh tokens / offline access where supported and required to keep the connection alive.
-- Validate issuer, audience/resource, signature, expiry, not-before, scope and subject on every request.
-- Register the user subject in the application before granting project access.
-- Do not accept Google access, refresh or ID tokens as MCP bearer credentials.
+## MCP backend → Google Cloud
+- Use a Google OAuth Web client with the exact Worker callback URI.
+- MVP scopes are read-only and least-privilege.
+- Validate state, PKCE, nonce, redirect URI and Google identity.
+- Encrypt tokens before Neon persistence; never return them to browser or ChatGPT.
+- Refresh only in Worker; use concurrency-safe token rotation.
+- Disconnect/revoke and block subsequent reads.
 
-### B. MCP backend → Google Cloud
-Purpose: authorize the connector to call Google APIs as the consenting Google identity.
-- Use a Google OAuth Web application with the exact Worker callback URI.
-- Use least-privilege read-only scopes for MVP.
-- Validate OAuth state, PKCE, nonce, redirect URI and returned identity.
-- Store provider tokens encrypted in Neon; never send them to ChatGPT or the browser.
-- Refresh tokens only on the backend; coordinate refresh rotation.
-- Revoke/disconnect safely and prevent future calls after revocation.
+## Per-call authorization
+A request is allowed only when MCP token, registered user, enabled tool, explicit user/project grant, same-user active Google connection, Google IAM permission, schema bounds and rate limits all pass. Missing or ambiguous checks deny access.
 
-## Authorization decision for each tool call
-A tool call is permitted only if all checks pass:
-1. MCP token is valid and intended for this resource.
-2. Subject maps to an enabled application user.
-3. Tool is enabled in this environment.
-4. Requested project is explicitly granted to that user.
-5. Google connection belongs to that same user and is active.
-6. Google IAM and API-level permissions permit the requested read.
-7. Request is within tool-specific bounds and rate limits.
+## Project grants
+Default deny. A grant is user + project + capability + status. MVP capability is read-only. Revocation applies to the next call. A project ID supplied in a prompt is not proof of authorization. Filter provider results to the user's explicit allow-list.
 
-Any missing/ambiguous condition denies the request. Never fall back to a broader service account or a different user's Google connection.
+## ChatGPT requirements
+HTTPS endpoint; compatible transport; OAuth discovery and authorization tested with the real ChatGPT UI; refresh token behavior verified; only read tools exposed. Tool schema changes may require workspace-admin review/refresh.
 
-## Project grant model
-- Default deny: no project is accessible until explicitly granted.
-- Grant is user + project + permitted capability + status + timestamps.
-- MVP capability is read-only.
-- Grant revocation takes effect on the next tool call.
-- Do not infer project membership from a project ID supplied in a prompt.
-- Never list all projects visible to a Google identity unless the app grant policy explicitly permits those results; filter output to the app's allow-list.
-
-## ChatGPT connection requirements
-- HTTPS endpoint reachable by ChatGPT.
-- Transport and protocol behavior verified against the current ChatGPT client, not merely unit tested.
-- OAuth discovery metadata and redirect flow verified with the ChatGPT custom MCP UI.
-- Ensure refresh/offline access is advertised and refresh tokens are actually issued where needed; OpenAI documents that missing refresh-token support may break long-lived connectivity.
-- Tool discovery exposes only the MVP read tools.
-- A changed tool schema may require a workspace administrator to refresh/review the tool snapshot.
-
-## Current known blockers
-- The Free account is not listed as eligible for custom MCP connections in current OpenAI documentation. Verify actual account/workspace UI; do not claim entitlement.
-- External MCP authorization issuer/JWKS/audience are not configured in the recorded baseline.
-- Google OAuth client and consent configuration are not live in the recorded baseline.
-- Restricted Neon runtime role/DSN and project grants are not provisioned in the recorded baseline.
-- /ready and /mcp remain expected to fail closed until required configuration is installed.
+## Recorded blockers
+The Free plan is not listed as eligible in current OpenAI custom MCP documentation. External MCP issuer/JWKS/audience, Google OAuth client, restricted Neon runtime role/DSN and project grants were not configured in the recorded baseline. /ready and /mcp are expected to fail closed until prerequisites are installed.
