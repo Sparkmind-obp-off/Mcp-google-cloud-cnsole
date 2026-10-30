@@ -1,8 +1,17 @@
 # Google Cloud Console Connector
 
-Cloudflare Worker + Neon PostgreSQL with independent MCP authentication, Google OAuth and a fail-closed Google write boundary.
+Cloudflare Pages frontend + Pages Functions UI layer, dedicated Cloudflare Worker backend/MCP server, and Neon PostgreSQL. The backend uses independent MCP authentication, Google OAuth and a fail-closed Google write boundary.
 
 **0.3.0 development deployment is live. This is NOT a production-ready Google connection.** Google OAuth/MCP issuer configuration and a restricted runtime database role are not provisioned. No Google Cloud write executor is enabled.
+
+## Target deployment architecture
+
+- **Cloudflare Pages** serves the frontend and static assets.
+- **Pages Functions** handle frontend routing and safe UI presentation adapters only; they do not host a second MCP server or duplicate Google API business logic.
+- **Dedicated Cloudflare Worker** remains the backend and authoritative MCP endpoint, Google OAuth handler, authorization layer and Google API adapter.
+- **Neon PostgreSQL** remains the application system of record.
+
+The current 0.3.0 development deployment still serves its existing dashboard from the Worker. Pages extraction is a documented next milestone, not a completed deployment. See [system architecture](docs/SYSTEM-ARCHITECTURE.md), [frontend/UI](docs/FRONTEND-AND-UX.md), [backend/MCP](docs/BACKEND-MCP-SPEC.md), [database](docs/DATABASE-DESIGN.md), [product/North Star](docs/PRODUCT-AND-NORTH-STAR.md), [MVP roadmap](docs/MVP-AND-ROADMAP.md) and [technical blueprint](docs/TECHNICAL-MVP-BLUEPRINT.md).
 
 ## URLs and GitHub
 
