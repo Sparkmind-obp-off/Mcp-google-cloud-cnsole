@@ -51,10 +51,13 @@ Do not invent authorization/token endpoints or reuse unrelated OAuth/Clerk crede
 
 ## 4. ChatGPT setup (only after plan and server gates pass)
 
-On ChatGPT web:
-1. Open **Settings → Apps** (or the workspace's Apps/Plugins management UI; labels vary during rollout).
-2. Enable Developer mode if the plan/workspace UI requires it and the user is authorized.
-3. Choose **Create** / **Add custom MCP server**.
+On ChatGPT web, use the current custom Plugins flow when it is available to the account/workspace:
+1. Open **Plugins → + → Add custom MCP server**.
+2. Enter the server name and HTTPS MCP endpoint.
+3. Configure the authentication flow supported by ChatGPT and implemented by the MCP authorization provider.
+4. Acknowledge the security notice, create the plugin and review its discovered tools.
+
+Some legacy custom-app/workspace experiences may instead expose **Settings → Apps** or an Apps/Create flow. Follow the UI actually available to the account. The current Plugins add-custom-MCP flow does not require enabling Developer Mode first; do not add that as a universal prerequisite.
 4. Name it `Google Cloud (Read Only)`.
 5. Enter the remote HTTPS MCP endpoint:
    `https://google-cloud-connector-development.sparkmind-support.workers.dev/mcp`
@@ -81,11 +84,15 @@ Use a dedicated test project with no production workloads. Record only timestamp
 
 A pass requires actual tool invocation through ChatGPT and a real Google API response. A dashboard status, local unit test, mocked API response, MCP initialize alone, or HTTP 200 on /health is not an end-to-end pass.
 
-## 6. Current implementation boundary
+## 6. Frontend/backend deployment boundary
+
+The planned deployment split is Cloudflare Pages for the frontend, Pages Functions for frontend routing and safe presentation adapters, and the existing dedicated Cloudflare Worker for the MCP backend, Google OAuth and Google API access. Pages Functions are not a second MCP server. The current 0.3.0 development dashboard is still served by the Worker; Pages extraction has not yet been deployed or verified. See `SYSTEM-ARCHITECTURE.md` and `TECHNICAL-MVP-BLUEPRINT.md`.
+
+## 7. Current implementation boundary
 
 The existing MainFunc branch implements a read-oriented MCP registry, legacy SDK transport and a synchronous native protocol subset. It does not yet have live ChatGPT client interoperability evidence. The deployed runtime is intentionally fail-closed while its issuer, restricted DB role and Google OAuth configuration are absent. Human approval UI and Google write executor are not implemented. Keep all writes disabled until a separate reviewed design and explicit per-operation approval exist.
 
-## 7. Official references
+## 8. Official references
 
 - ChatGPT custom MCP setup and plan availability: https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt
 - OpenAI Apps SDK: https://developers.openai.com/apps-sdk/
