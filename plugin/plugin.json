@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "google-cloud-connector",
+  "version": "0.1.0",
+  "description": "A guarded Google Cloud integration with OAuth 2.0 and explicit approval for every supported write.",
+  "author": { "name": "Private plugin" },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Google Cloud Connector",
+        "shortDescription": "Google Cloud project access",
+        "longDescription": "Source package for a Cloudflare-hosted Google Cloud MCP connector. It is not ready to connect until the MCP OAuth server, Google OAuth grant, and deployment are verified.",
+        "developerName": "Private",
+        "category": "Developer tools",
+        "capabilities": [],
+        "defaultPrompt": "Inspect my Google Cloud projects and configuration safely."
+      }
+    }
+  }
+}
