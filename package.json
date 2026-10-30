@@ -1,0 +1,27 @@
+{
+  "name": "google-cloud-console-connector",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "build": "wrangler deploy --config worker/wrangler.toml --env='' --dry-run --outdir dist",
+    "dev:sandbox": "wrangler dev --config worker/wrangler.toml --local --ip 0.0.0.0 --port 3000",
+    "db:check": "node scripts/database.js check",
+    "db:migrate": "node scripts/database.js migrate",
+    "release:check": "node scripts/release-check.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@neondatabase/serverless": "1.2.0",
+    "jose": "6.2.14",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
+    "wrangler": "4.153.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

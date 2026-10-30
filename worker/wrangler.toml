@@ -1,12 +1,22 @@
 name = "google-cloud-connector"
 main = "src/index.js"
 compatibility_date = "2026-10-30"
+workers_dev = true
 
-[[d1_databases]]
-binding = "DB"
-database_name = "google-cloud-connector"
-database_id = "REPLACE_AFTER_CREATING_D1"
-
+# Neon HTTP driver; no D1 or KV database bindings.
+# Secrets must be provisioned through Workers > Settings > Variables and Secrets.
+# Never add DATABASE_URL, Google credentials, JWTs or encryption keys here.
 [vars]
-APP_ORIGIN = "https://REPLACE-WITH-WORKER-DOMAIN"
-GOOGLE_REDIRECT_URI = "https://REPLACE-WITH-WORKER-DOMAIN/oauth/google/callback"
+ENVIRONMENT = "production"
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = false
+
+[env.development]
+name = "google-cloud-connector-development"
+[env.development.vars]
+ENVIRONMENT = "development"

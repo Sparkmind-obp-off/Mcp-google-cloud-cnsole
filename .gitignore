@@ -9,3 +9,10 @@ node_modules/
 coverage/
 dist/
 *.log
+*.backup
+*.bak
+*.tar.gz
+*.zip
+pids/
+.pm2/
+release-evidence.json

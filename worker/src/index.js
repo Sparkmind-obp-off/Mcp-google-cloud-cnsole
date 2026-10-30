@@ -1,112 +1,100 @@
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
-const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
-const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
+import { z } from 'zod';
+import { Store } from './database.js';
+import { ConnectorError, authenticate, configuration, fail, readJson } from './security.js';
+import { beginOAuth, callback, disconnect } from './oauth.js';
+import { handleMcp } from './mcp.js';
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
-}
-function html(body, status = 200) {
-  return new Response(body, {
-    status,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
-    }
-  });
-}
-function b64url(bytes) {
-  return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-async function sha256(value) {
-  return b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
-}
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-
-    if (request.method === "GET" && url.pathname === "/health") {
-      return json({
-        ok: true,
-        service: "google-cloud-connector",
-        stage: "scaffold",
-        mcpEnabled: false,
-        googleOAuthConfigured: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REDIRECT_URI)
-      });
-    }
-
-    // Scaffold only: state is one-time and short-lived, but no token is persisted.
-    if (request.method === "GET" && url.pathname === "/oauth/google/start") {
-      if (!env.DB || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_REDIRECT_URI) {
-        return json({ error: "Google OAuth or D1 is not configured" }, 503);
-      }
-      const state = b64url(crypto.getRandomValues(new Uint8Array(32)));
-      const stateHash = await sha256(state);
-      const now = Math.floor(Date.now() / 1000);
-      await env.DB.prepare(
-        "INSERT INTO oauth_states (state_hash, created_at, expires_at) VALUES (?, ?, ?)"
-      ).bind(stateHash, now, now + 600).run();
-
-      const auth = new URL(GOOGLE_AUTH);
-      auth.search = new URLSearchParams({
-        client_id: env.GOOGLE_CLIENT_ID,
-        redirect_uri: env.GOOGLE_REDIRECT_URI,
-        response_type: "code",
-        scope: "openid email https://www.googleapis.com/auth/cloud-platform.read-only",
-        access_type: "offline",
-        prompt: "consent",
-        state
-      }).toString();
-      return Response.redirect(auth.toString(), 302);
-    }
-
-    if (request.method === "GET" && url.pathname === "/oauth/google/callback") {
-      const state = url.searchParams.get("state");
-      const code = url.searchParams.get("code");
-      if (url.searchParams.has("error")) return html("<h1>Google authorization was not completed.</h1>", 400);
-      if (!state || !code || !env.DB || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_REDIRECT_URI) {
-        return json({ error: "Invalid or incomplete OAuth callback" }, 400);
-      }
-
-      const stateHash = await sha256(state);
-      const now = Math.floor(Date.now() / 1000);
-      const row = await env.DB.prepare(
-        "SELECT state_hash FROM oauth_states WHERE state_hash = ? AND expires_at > ?"
-      ).bind(stateHash, now).first();
-      if (!row) return json({ error: "OAuth state invalid, expired, or already used" }, 400);
-      await env.DB.prepare("DELETE FROM oauth_states WHERE state_hash = ?").bind(stateHash).run();
-
-      const tokenResponse = await fetch(GOOGLE_TOKEN, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          code,
-          client_id: env.GOOGLE_CLIENT_ID,
-          client_secret: env.GOOGLE_CLIENT_SECRET,
-          redirect_uri: env.GOOGLE_REDIRECT_URI,
-          grant_type: "authorization_code"
-        })
-      });
-      if (!tokenResponse.ok) {
-        return json({ error: "Google token exchange failed", upstreamStatus: tokenResponse.status }, 502);
-      }
-
-      // Deliberately do not persist the token: encrypted token storage and account
-      // binding must be implemented and tested before enabling a real connection.
-      const token = await tokenResponse.json();
-      if (!token.refresh_token) {
-        return html("<h1>Google did not return a refresh token.</h1><p>No token was stored.</p>", 400);
-      }
-      return html("<h1>OAuth code exchange succeeded.</h1><p>This scaffold intentionally discarded the token. No Google Cloud connection is active yet.</p>");
-    }
-
-    if (url.pathname === "/mcp") {
-      return json({
-        error: "MCP is disabled until MCP OAuth, encrypted token storage, request authorization, and approval-gated tools are implemented."
-      }, 501);
-    }
-
-    return json({ error: "Not found" }, 404);
+const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
+const json = (value, status = 200, headers = {}) => new Response(JSON.stringify(value), { status, headers: { ...JSON_HEADERS, ...headers } });
+function protect(response, request, env) {
+  const headers = new Headers(response.headers);
+  headers.set('x-content-type-options', 'nosniff');
+  headers.set('content-security-policy', "default-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+  headers.set('referrer-policy', 'no-referrer');
+  headers.set('cache-control', 'no-store');
+  headers.set('strict-transport-security', 'max-age=31536000');
+  if (request.headers.get('origin') === env.APP_ORIGIN) {
+    headers.set('access-control-allow-origin', env.APP_ORIGIN);
+    headers.set('vary', 'Origin');
+    headers.set('access-control-allow-methods', 'GET, POST, OPTIONS');
+    headers.set('access-control-allow-headers', 'Authorization, Content-Type, Accept, MCP-Protocol-Version');
+    headers.set('access-control-expose-headers', 'WWW-Authenticate');
   }
-};
+  return new Response(response.body, { status: response.status, headers });
+}
+export function createWorker(dependencies = {}) {
+  return {
+    async fetch(request, env) {
+      let response;
+      try { response = await route(request, env, dependencies); }
+      catch (error) {
+        const code = error instanceof ConnectorError ? error.code : error instanceof z.ZodError ? 'INVALID_ARGUMENTS' : 'INTERNAL_ERROR';
+        const status = error instanceof ConnectorError ? error.status : error instanceof z.ZodError ? 400 : 500;
+        const headers = {};
+        if (status === 401) {
+          // Config is server-controlled; do not reflect the untrusted Host header.
+          headers['www-authenticate'] = env.APP_ORIGIN
+            ? `Bearer resource_metadata="${env.APP_ORIGIN}/.well-known/oauth-protected-resource", scope="mcp:read"`
+            : 'Bearer';
+        }
+        if (status === 429) headers['retry-after'] = '60';
+        response = json({ error: { code } }, status, headers);
+      }
+      return protect(response, request, env);
+    }
+  };
+}
+async function route(request, env, deps) {
+  const url = new URL(request.url);
+  if (url.pathname === '/health' && request.method === 'GET') return json({
+    ok: true, service: 'google-cloud-connector', stage: 'development-read-only', productionReady: false,
+    writesEnabled: false, voiceImplemented: false
+  });
+  const config = configuration(env);
+  if (url.pathname === '/ready' && request.method === 'GET') {
+    if (!config.ok) return json({ ready: false, code: 'CONFIGURATION_REQUIRED' }, 503);
+    try { await (deps.store || new Store(env.DATABASE_URL)).ready(); }
+    catch { return json({ ready: false, code: 'DATABASE_NOT_READY' }, 503); }
+    return json({ ready: true, productionReady: false, writesEnabled: false });
+  }
+  const origin = request.headers.get('origin');
+  if (origin && origin !== env.APP_ORIGIN) fail('ORIGIN_NOT_ALLOWED', 403);
+  if (env.APP_ORIGIN && url.origin !== env.APP_ORIGIN && env.ENVIRONMENT !== 'development') fail('HOST_NOT_ALLOWED', 403);
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
+  if (!['/mcp', '/oauth/google/start', '/oauth/google/callback', '/connections/disconnect', '/.well-known/oauth-protected-resource'].includes(url.pathname)) fail('NOT_FOUND', 404);
+  if (url.pathname === '/.well-known/oauth-protected-resource' && request.method === 'GET') {
+    if (!env.APP_ORIGIN || !env.MCP_AUTH_ISSUER) fail('AUTH_NOT_CONFIGURED', 503);
+    return json({ resource: `${env.APP_ORIGIN}/mcp`, authorization_servers: [env.MCP_AUTH_ISSUER], scopes_supported: ['mcp:read'], bearer_methods_supported: ['header'] });
+  }
+  if (!config.ok) fail('CONFIGURATION_REQUIRED', 503);
+  const store = deps.store || new Store(env.DATABASE_URL);
+  if (url.pathname === '/oauth/google/callback' && request.method === 'GET') return callback(request, env, store, deps.oauth);
+  const user = await authenticate(request, env, (issuer, subject) => store.user(issuer, subject), deps.verifyMcpToken);
+  await store.rate(user.id);
+  if (url.pathname === '/oauth/google/start' && request.method === 'POST') {
+    // JSON-only POST plus exact same-origin check prevents browser CSRF. Bearer token never goes in URL.
+    if (origin !== env.APP_ORIGIN) fail('ORIGIN_REQUIRED', 403);
+    z.strictObject({}).parse(await readJson(request));
+    await store.rate(user.id, 'oauth-start', 5);
+    const started = await beginOAuth(user, env, store);
+    return json({ authorizationUrl: started.authorizationUrl }, 200, { 'set-cookie': started.cookie });
+  }
+  if (url.pathname === '/connections/disconnect' && request.method === 'POST') {
+    if (origin !== env.APP_ORIGIN) fail('ORIGIN_REQUIRED', 403);
+    const body = z.strictObject({ connectionId: z.uuid(), confirm: z.literal('disconnect') }).parse(await readJson(request));
+    return json(await disconnect(user, body.connectionId, env, store));
+  }
+  if (url.pathname === '/mcp') {
+    if (request.method !== 'POST') return json({ error: { code: 'METHOD_NOT_ALLOWED' } }, 405, { allow: 'POST' });
+    const body = await readJson(request);
+    if (Array.isArray(body) || !body || typeof body !== 'object') fail('INVALID_MCP_MESSAGE', 400);
+    // SDK 1.32.2 supports initialization-based protocol revisions through 2025-11-25.
+    // Do not claim native support for the newer 2026 request-metadata protocol.
+    const version = request.headers.get('mcp-protocol-version');
+    if (version && !['2025-11-25', '2025-06-18', '2025-03-26'].includes(version)) fail('UNSUPPORTED_MCP_PROTOCOL', 400);
+    if (body.method === 'initialize' && !['2025-11-25', '2025-06-18', '2025-03-26'].includes(body.params?.protocolVersion)) fail('UNSUPPORTED_MCP_PROTOCOL', 400);
+    return handleMcp(request, body, user, env, store);
+  }
+  fail('METHOD_NOT_ALLOWED', 405);
+}
+export default createWorker();
