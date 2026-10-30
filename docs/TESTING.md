@@ -1,38 +1,45 @@
-# Testing and evidence
+# Testing and evidence — 0.3.0
 
-## Automated commands
+## Commands
 
 ```sh
 npm ci
 npm test
-npm run build
 npm audit
+npm run build:development
+npm run build
 npm run db:check
 npm run release:check
 ```
 
-The last two require special interpretation: database check needs a real securely provisioned DSN and is BLOCKED without it; release check deliberately exits 2 because known implementation and live-verification gaps remain.
+Database check needs a securely supplied DSN. The initial approved migration is already applied; the deployed development Worker deliberately has no administrative DSN installed. Release check still exits 2: production acceptance is incomplete. Stop local PM2 preview before embedded PostgreSQL tests on the 1 GiB sandbox to avoid memory pressure.
 
-## Local automated coverage
+## Automated coverage: 42 pass, zero fail
 
-`tests/security.test.js`: RFC PKCE vector, AES-GCM roundtrip/wrong key/AAD/tampering, canonical hashing, configuration rejection, strict input/path/page validation, approval identity/payload/state/expiry/replay, signed JWT signature/issuer/audience/expiration/scope/user checks, bounded JSON parser, safe Google error mapping and known-secret redaction.
+- `security.test.js`: RFC PKCE vector, AES-GCM/AAD/tampering, canonical hash, config/input/path/page limits, exact approval identity/payload/state/expiry/replay, locally signed JWT issuer/audience/expiry/scope/registered-user checks, bounded JSON, safe Google errors and known-sensitive-field redaction.
+- `integration.test.js`: actual isolated PGlite PostgreSQL migration, schema/index/FKs/rollback/tenant boundaries, atomic OAuth state expiry/consumption, mock Google encrypted callback/wrong nonce/refresh rotation/CAS/revoke, authorization-before-API, approval SQL races/replay/stale hash/immutability/audits, legacy SDK initialize/list/call and auth/origin/start checks.
+- `modern-and-ui.test.js`: native 2026 discover/list/call without initialize, required per-request params._meta, exact mirror headers, Base64 sentinel validation, unsupported versions, invalid IDs/Accept/JSON/envelopes, unknown method/tool handling, route auth/origin, strict advertised schemas, secret-free dashboard status/CSP, voice explicit-click/no-autosend simulation, budget opt-in/scope/associated-account/single-project filtering, default-vs-opt-in consent scopes.
 
-`tests/integration.test.js`: executes the actual PostgreSQL schema in PGlite, checks required tables/indexes/tenant FKs and rollback; exercises real SQL state consumption/expiry, encrypted callback persistence with mock Google, wrong nonce, refresh token rotation/CAS, project-before-API validation, approval decision/claim/replay/race and immutable audit records, official SDK initialize/discovery/call, malformed args, unsupported versions, bearer/origin checks, same-origin OAuth start and explicit disconnect/revocation with mocked provider.
+Mock Google responses are explicitly labeled. Locally signed JWT tests do not prove live Google identity verification or external MCP client registration. PGlite validates PostgreSQL behavior but is not the Neon network. Voice tests simulate SpeechRecognition/speechSynthesis APIs and do not use a physical microphone or actual recognition provider. Optional MCP subscriptions/MRTR/tasks are not implemented or advertised; tested subset is not a full client-conformance certification.
 
-PGlite is an isolated embedded PostgreSQL engine, not a Neon network service. Mock Google responses and dependency-injected identity verification are labeled in the tests; live Google identity signatures are not being claimed. JWT cryptography itself is tested using locally generated keys. Concurrent SQL tests validate a single PostgreSQL engine; distributed Neon contention/load behavior still needs live verification.
+## Live Neon verification and approved migration
 
-## Evidence from this implementation session
+Uploaded PostgreSQL DSN was read in memory, not printed or committed. Both HTTP and WebSocket read-only tests connected to neondb/public on PostgreSQL 18.6. After specific user approval, the original runner applied only 001_initial.sql at 2026-10-30T11:56:31.386Z. Remote checksum matches; 12 public tables and all 9 pre-existing neon_auth tables remain. No application users/grants/data seeded and no roles changed. The supplied admin role has CREATEDB/CREATEROLE/BYPASSRLS and is not suitable for public Worker runtime. Distributed contention, restricted runtime privileges and recovery are not verified.
 
-- 25 automated tests pass; zero failures (including nested test count).
-- Cloudflare Worker bundle dry-run passes. It is NOT a deployment.
-- `npm audit`: zero vulnerabilities after upgrading the originally vulnerable Zod 3 dependency to 4.6.7.
-- Cloudflare whoami succeeds. Existing target Worker lookup returned code 10007 (does not exist).
-- Supplied Neon S3 credentials were used for a signed GET ListBuckets only: HTTP 403 `AccessDenied`; no bucket/object listing was returned. This does not prove credentials invalid or storage operational; bucket-level access may be different. No write was attempted.
-- AI Gateway live check is BLOCKED: branch-specific NEON_AI_GATEWAY_BASE_URL was not supplied. No guessed endpoint received the token, no inference/generation was run and no voice feature exists.
-- Follow-up Neon live read-only connectivity: PASS through both HTTP and WebSocket, database neondb, schema public, PostgreSQL 18.6. Public has zero tables, no connector migration tracker exists, and the supplied administrative role is too broad for runtime (CREATEDB/CREATEROLE/BYPASSRLS). No credentials were logged/persisted and no DDL/application DML was run. Production migration, restricted runtime role and deployed secret binding remain BLOCKED pending approval/configuration. Google live consent/API tests remain BLOCKED: client configuration and authorized account absent.
+## Actual BYOK development deployment
 
-Local preview verification is recorded in VALIDATION.md after the runtime check. A sandbox URL is not a production deployment.
+URL: https://google-cloud-connector-development.sparkmind-support.workers.dev
 
-## Required live tests not run
+Worker version: 1f17e7b3-c06f-448d-92ca-7e77dbdf15bd; deployed application commit d24add4245b31bf26db2b5f338501c84207aa988 on MainFunc. Build approximately 323 KiB gzip, reported startup 44 ms. This is development, not a production-ready connector.
 
-Approved Neon migration, restricted runtime connector-table permissions and distributed behavior; Google OAuth redirect/ID token/callback/token expiry-refresh/revoke; each supported API and permission failure against an authorized project; actual MCP client authorization/initialization/tool discovery/read; independently approved write, stale-state/replay/expiry/unknown-outcome auditing; endpoint rate/abuse tests and operational key/backup recovery. Never run destructive tests against production. Do not replace these with fabricated provider responses in acceptance reports.
+Verified: root/script/health/status 200, ready 503 CONFIGURATION_REQUIRED, unconfigured MCP 503, untrusted-origin MCP 403, metadata 503 AUTH_NOT_CONFIGURED and execution path 404. Live browser loaded title Google Cloud Console Connector with zero console messages. No runtime DB/admin/Google secrets were deployed.
+
+An earlier sandbox browser attempt timed out while the old UI fetched expected readiness 503; the UI now skips readiness probes when configuration is absent. Final Cloudflare browser load passed. Earlier low-memory PGlite SIGKILL was resolved by stopping preview before tests; the complete suite then passed. Neither issue was papered over as a passing run.
+
+## Other credentials
+
+Earlier signed read-only S3 ListBuckets returned 403 AccessDenied; no bucket data/write. AI Gateway still lacks branch-specific base URL; token not sent to guessed hosts. Browser voice needs neither these tokens nor paid audio generation. No GCP mutation or AI inference was executed.
+
+## Outstanding live acceptance
+
+Restricted DB role/secret binding; actual Google consent/refresh/revoke and real API reads/IAM/API-disabled cases; actual external MCP auth/client connection; independently authenticated human consent and audited state-revalidated executor; individually approved controlled write; WAF/rate/retention, token-key/backup recovery; physical voice device/provider privacy review. No destructive production tests are authorized by a generic instruction to finish.

@@ -20,7 +20,9 @@
 - A separately authenticated human approval channel and audited executor with IAM/write-scope validation and current-state rereads.
 - Production least-privilege database role and review; app tests do not demonstrate provider-side role configuration. Do not use the migration owner as the Worker runtime identity. Limit audit/security tables to INSERT/SELECT; do not grant runtime ALTER/TRIGGER privileges.
 - Retention, cleanup, backup/recovery, incident response practice, key rotation and token re-encryption procedure verification.
-- Native latest MCP protocol implementation and client security/interoperability testing.
+- Native 2026 synchronous protocol subset is implemented and locally tested; actual external client interoperability, broader protocol conformance and security review remain outstanding.
+- Dashboard uses same-origin external JS, strict CSP, no Google/API/database secrets embedded, in-memory-only MCP client token input and no local/session storage. Browser voice requires explicit clicks; transcripts never call tools or approve operations. Physical mic/provider behavior and recognition privacy remain unverified.
+- Budget reads are disabled by default. Opt-in requests the Google-required cloud-billing scope, rechecks grants after refresh, derives billing account from the selected project's association and filters mixed/account-wide budgets. No billing mutation API is exposed.
 
 ## Secrets and rotation
 
@@ -32,4 +34,4 @@ Cloudflare invocation logs are disabled in tracked configuration; never add logs
 
 ## Reporting and acceptance
 
-No production-ready claim is made. Passing isolated tests is not a penetration test or evidence of live Google/Neon connectivity. Send suspected vulnerabilities privately to the repository owner without including live credentials in public issues.
+No production-ready claim is made. Passing isolated tests is not a penetration test or evidence of live Google OAuth/API connectivity. Live Neon connection and the approved initial migration have separate actual evidence; these do not prove production runtime permissions or application readiness. Send suspected vulnerabilities privately to the repository owner without including live credentials in public issues.

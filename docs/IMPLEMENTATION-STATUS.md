@@ -1,50 +1,47 @@
-# Implementation status — 2026-10-30
+# Implementation status — 0.3.0 development, 2026-10-30
 
 Labels: **PASS — Verified working.** **PARTIAL — Implemented but not fully verified.** **BLOCKED — Requires external configuration or access.** **NOT IMPLEMENTED — Not yet built.**
 
-## Phase 0 repository findings
+## Current evidence
 
-Baseline `e898118`, main clean/synchronized. All existing tracked files inspected before edits. Existing Worker, plugin metadata and skill package preserved; incomplete OAuth/D1 boundaries were replaced rather than adding a competing app. No package/build/test framework existed. Original MCP returned 501 and OAuth discarded tokens. The old proposal included IAM writes; these are explicitly excluded from this release. No voice feature was found.
-
-## Status matrix
-
-| Area | Status | Evidence / gap |
+| Area | Status | Actual evidence / limitation |
 |---|---|---|
-| Repository audit and GitHub access | PASS — Verified working. | Existing selected repo inspected, main fetched; push verified separately by final report |
-| Cloudflare account authentication | PASS — Verified working. | BYOK whoami succeeded; does not prove deployment permission |
-| Worker build | PASS — Verified working. | Wrangler dry-run bundle; not remotely published |
-| Local security/integration suite | PASS — Verified working. | 25 tests, zero failures; PGlite and mocked Google as documented |
-| Dependency audit | PASS — Verified working. | npm audit reports zero vulnerabilities |
-| Neon primary store/schema/migration runner | PARTIAL — Implemented but not fully verified. | Actual schema and constraints execute in embedded PostgreSQL; no D1 |
-| Live Neon connectivity | PASS — Verified working. | In-memory uploaded credentials connected via HTTP and WebSocket; neondb/public, PostgreSQL 18.6, read-only enforced |
-| Neon production migration/runtime role | BLOCKED — Requires external configuration or access. | Zero public tables and no tracker; explicit migration approval required. Provided role has CREATEDB/CREATEROLE/BYPASSRLS; restricted runtime role and secret binding not provisioned |
-| Google OAuth code, encryption, refresh/revoke | PARTIAL — Implemented but not fully verified. | Mock-provider and cryptographic tests pass |
-| Live Google authorization | BLOCKED — Requires external configuration or access. | Google client config, final URI and authorized account unavailable |
-| MCP JWT protected resource | PARTIAL — Implemented but not fully verified. | Signed JWT tests pass; external issuer and actual client not configured |
-| External authorization server/client setup | BLOCKED — Requires external configuration or access. | Issuer/JWKS/audience, registered user and target MCP client required |
-| Built-in MCP token issuer/login UI | NOT IMPLEMENTED — Not yet built. | External provider boundary is intentional; no local OAuth server claimed |
-| MCP legacy-compatible Streamable HTTP | PARTIAL — Implemented but not fully verified. | Official SDK initialize/list/call pass locally; supported through 2025-11-25 |
-| Native current 2026 MCP protocol | NOT IMPLEMENTED — Not yet built. | Unsupported versions explicitly rejected |
-| GCP read tool registry | PARTIAL — Implemented but not fully verified. | Schemas and fixed APIs implemented, representative invocation mocked; no real GCP reads |
-| Budget reads | NOT IMPLEMENTED — Not yet built. | Only project billing association read exists |
-| Approval storage/validation | PARTIAL — Implemented but not fully verified. | Exact identity/hash/expiry/atomic consumption/audit tested; internal library only |
-| Human approval UI / write executor | NOT IMPLEMENTED — Not yet built. | No mutation endpoint/tool or broad Google write scope |
-| End-to-end production security acceptance | BLOCKED — Requires external configuration or access. | Live identities/projects/client and remaining implementation required |
-| Cloudflare production deploy | BLOCKED — Requires external configuration or access. | Target Worker absent; release checks intentionally fail |
-| Voice | NOT IMPLEMENTED — Not yet built. | No voice feature/spec; AI token is not a voice test |
-| S3 live read | BLOCKED — Requires external configuration or access. | Signed GET ListBuckets denied with 403 AccessDenied, no writes |
-| AI Gateway check | BLOCKED — Requires external configuration or access. | Branch-specific gateway base URL missing, token not sent to guessed hosts |
+| Original repository audit | PASS — Verified working. | All 13 original tracked files inspected; existing Worker/plugin architecture preserved |
+| Requested Git branch | PASS — Verified working. | 0.3.0 application pushed to MainFunc; main not overwritten |
+| Live Neon connection | PASS — Verified working. | HTTP and WebSocket, neondb/public, PostgreSQL 18.6 |
+| Approved initial migration | PASS — Verified working. | 001_initial.sql committed remotely at 2026-10-30T11:56:31.386Z, checksum matches, 12 public tables, 9 neon_auth tables preserved |
+| Runtime DB identity/binding | BLOCKED — Requires external configuration or access. | Supplied admin has CREATEDB/CREATEROLE/BYPASSRLS; no role change was approved or made and admin DSN was not deployed |
+| Automated suite / audit | PASS — Verified working. | 42 tests pass; zero npm audit vulnerabilities; source secret scan clean |
+| Native MCP 2026 subset | PARTIAL — Implemented but not fully verified. | Discovery/ping/tools/list/call, per-request metadata, headers, resultType/errors, notifications tested locally; actual MCP-client interoperability missing |
+| Legacy MCP transport | PARTIAL — Implemented but not fully verified. | Official SDK initialization-era tests pass; no actual authorized external client |
+| Google OAuth/encrypted lifecycle | PARTIAL — Implemented but not fully verified. | Mock callback, identity, refresh/CAS and revoke tests; real Google client/consent not available |
+| External MCP issuer/user registration | BLOCKED — Requires external configuration or access. | Issuer/JWKS and users not provisioned; no token issuer invented |
+| Google read tools | PARTIAL — Implemented but not fully verified. | Fixed-host schema-validated registry and representative mock tests; no real Google projects queried |
+| Budget read | PARTIAL — Implemented but not fully verified. | Opt-in cloud-billing scope, associated-account derivation and single-project filtering tested with mocks; default disabled, live IAM/API unavailable |
+| Onboarding/dashboard | PASS — Verified working. | Deployed HTML/JS 200, browser loads with zero console messages; shows actual unconfigured booleans |
+| End-user onboarding/login | PARTIAL — Implemented but not fully verified. | Registered-user token workbench/Google start UI exists; no login/registration/project-grant provider/UI configured |
+| Browser voice | PARTIAL — Implemented but not fully verified. | Explicit-click dictation/speech adapters tested with mocks; UI loads; physical mic/remote recognition not tested |
+| Approval primitives | PARTIAL — Implemented but not fully verified. | Exact identity/payload/state/expiry, SQL races/claim/replay/audit tests pass; no public consent or executor route |
+| Human consent UI / GCP executor | NOT IMPLEMENTED — Not yet built. | Dashboard explains disabled gate but does not display a live approval list or fabricate approval IDs |
+| BYOK development deployment | PASS — Verified working. | google-cloud-connector-development, version 1f17e7b3-c06f-448d-92ca-7e77dbdf15bd; live URLs checked |
+| Production readiness/deployment | BLOCKED — Requires external configuration or access. | No production publish; /ready and /mcp correctly 503 in development until runtime prerequisites exist |
 
-## Exact implementation sequence from audit
+Development URL: https://google-cloud-connector-development.sparkmind-support.workers.dev
 
-1. Establish package/build/dependency audit and Neon schema/migration boundary.
-2. Add safe configuration, cryptography, external MCP auth, tenant-aware store and OAuth lifecycle.
-3. Add SDK transport and strictly validated Google read registry.
-4. Add internal approval invariants without exposing an unsafe consent/execution route.
-5. Test actual PostgreSQL constraints/SQL, OAuth failure paths, MCP transport, redaction and replay prevention locally.
-6. Complete accurate docs, local runtime verification, secret scanning and push only tested changes to existing main.
-7. STOP production publish until prerequisites and acceptance gates are satisfied.
+## Deployment boundaries
 
-## Remaining sequence / required actions
+Public Worker has no DATABASE_URL, Google client secret, token-encryption key or external issuer configured. Only nonsecret development origin/redirect/audience and disabled budget flag are bound. No uploaded credentials were exposed, no runtime admin DSN was installed, no application users or permissions seeded, and no Google Cloud resource mutation occurred. Role provisioning remains a separate exact administrative change, not part of the approved schema migration.
 
-Rotate previously shared credentials; retain/reuse the now-available uploaded Neon credentials without logging them; obtain explicit approval for the initial migration on neondb/public and separately provision a restricted runtime role/secret binding; configure Google client and external MCP OAuth provider; implement a browser login/consent interface and register controlled users/projects; run live read tests and actual MCP client negotiation; implement independently authenticated human approval and audited state-revalidated executor; test each approved mutation on a controlled project; review production WAF/DB privileges/retention/key recovery; approve exact Worker production deploy and verify returned endpoints. Adding credentials alone is not sufficient to pass acceptance.
+Native protocol implementation supports synchronous read tools only and does not advertise optional subscriptions, MRTR sampling/elicitation or tasks. Compatibility beyond tested requests requires a real client and production security review; local schema/protocol tests are not certification.
+
+## Remaining sequence
+
+1. Provision/review a restricted runtime database role and safe secret binding; rotate previously shared secrets without pasting them into chat.
+2. Configure Google client and independent MCP provider; register controlled users/project grants via approved administration.
+3. Verify live Google consent/token lifecycle, actual MCP client discovery/invocation, IAM denials/API-disabled errors and each real read capability.
+4. Add independently authenticated human confirmation, current-state reread, write-scope/IAM validation, idempotency/unknown-outcome handling and result audits; run only individually approved controlled GCP operations.
+5. Review WAF/rate limits, DB permissions/retention, key/backup recovery and browser voice privacy; pass production acceptance before production publish.
+
+## Historical baseline
+
+Original e898118 scaffold had D1 placeholders, discarded OAuth tokens and disabled MCP. 0.2.0 added secure read-only foundations, 25 tests and isolated PostgreSQL validation. The first live read check found an empty public schema; the user later explicitly approved the exact initial migration, which is now applied. Earlier blocked-migration and unimplemented-native/voice/budget observations in historical records are superseded by the current matrix.

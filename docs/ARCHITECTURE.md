@@ -11,7 +11,9 @@ Baseline commit: `e898118`. All 13 tracked files were inspected before edits. Th
 - `database.js`: Neon HTTP prepared queries, user/connection/project authorization, state consumption, rate counters and audit persistence.
 - `oauth.js`: Google auth code + PKCE, server state plus browser cookie, signed Google ID-token verification, encrypted access/refresh tokens, refresh CAS, explicit disconnect.
 - `tools.js`: allowlisted Google API read requests with Zod schemas, response bounds and known-sensitive-field redaction.
-- `mcp.js`: official MCP SDK, stateless Web Standard Streamable HTTP and JSON replies; server instance per request, no in-memory session store.
+- `mcp.js`: shared tenant-aware tool registry and official SDK for legacy stateless HTTP.
+- `mcp-modern.js`: native 2026-07-28 discovery/ping/tools subset, per-request metadata, header mirroring and strict JSON-RPC errors; same registry as legacy.
+- `dashboard.js`: same-origin onboarding/status/read workbench and explicit-click optional browser voice; no Google token/DSN embedded, no approval/executor route.
 - `approvals.js`: internal-only persistence and validation primitives; NO Google write transport.
 - `database/migrations`: PostgreSQL schema. D1 configuration removed; old schema path retained only as a retirement notice.
 
@@ -30,4 +32,4 @@ OAuth refresh uses conditional ciphertext replacement to avoid overwriting a con
 
 ## Current limitations
 
-No live provider verification, no built-in login/onboarding UI, no native 2026 MCP metadata protocol, no actual MCP client connection, no human consent UI or write executor, no production release. No background jobs or cron dependency. Retention/cleanup is an operator maintenance task until implemented safely.
+Live Neon connection and initial approved migration are verified; development Worker is deployed. Google OAuth/API and actual MCP client connection remain unverified. Native 2026 synchronous read subset and onboarding/workbench/browser voice UI exist; external-provider login, human consent UI and write executor do not. No production release. Budget read is implemented behind explicit scope opt-in; no live Google billing access is claimed. No background jobs or cron dependency. Retention/cleanup is an operator maintenance task until implemented safely.

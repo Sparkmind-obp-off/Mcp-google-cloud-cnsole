@@ -16,12 +16,14 @@ Assets: Google refresh/access tokens, Google identity, external MCP JWTs, projec
 | SSRF / arbitrary API proxy | Fixed API host registry, schema-validated path segments, no redirects | Registry changes require review |
 | Application secret leakage | Known-sensitive-field redaction and no raw logs | Resource names/labels/custom fields can contain arbitrary data; redaction is not a universal DLP system |
 | Abuse / resource exhaustion | Input/output limits, timeouts, bounded pages, authenticated persistent rate counters | Add edge WAF/rate limits and retention before production; unauthenticated auth checks still cost resources |
-| Protocol downgrade / incompatibility | Explicit negotiated SDK-era version allowlist | Native 2026 protocol and actual client compatibility not implemented/verified |
+| Protocol downgrade / incompatibility | Native 2026 subset with required metadata/header matching and legacy SDK allowlist; shared registry | Actual client interoperability and broader conformance/security review unverified |
+| Voice self-approval / accidental execution | Microphone only after explicit click; transcripts stay in textarea and cannot call tools; no executor exists | Browser/recognition provider may process audio; physical device/privacy verification required |
+| Billing cross-project disclosure | Account derived from selected project and budgets filtered to exclusively selected project; explicit billing-scope opt-in | Google IAM/API and live budget grants unverified |
 
 ## Non-goals / forbidden writes
 
-No project/folder/organization deletion, billing modification, IAM writes, privilege escalation, key generation, security-control disabling or destructive bulk operations. No Google Cloud writes of any kind are enabled in this release. No S3 writes, AI inference charges, voice generation or cloud migrations were performed during verification.
+No project/folder/organization deletion, billing modification, IAM writes, privilege escalation, key generation, security-control disabling or destructive bulk operations. No Google Cloud writes of any kind are enabled in this release. No S3 writes or paid AI/voice inference occurred. The user-approved initial Neon schema migration was applied; no application data, roles or Google Cloud resources were mutated. Browser voice adapters were tested with simulated APIs, not a physical microphone.
 
 ## Acceptance evidence still required
 
-Live Neon read test, reviewed migration approval and deployment; real Google OAuth and IAM denial paths; actual external MCP client login; independent human consent security review; controlled test-project mutation, revalidation and complete outcome audit; operational incident/recovery exercise. Until then the connector remains development-only.
+Live Neon connection and the approved initial migration are verified, and the development Worker is deployed. Still required: restricted runtime role/secret binding; real Google OAuth and IAM denial paths; actual external MCP client login; independent human consent security review; controlled test-project mutation, revalidation and complete outcome audit; operational incident/recovery exercise. Until then the connector remains development-only.

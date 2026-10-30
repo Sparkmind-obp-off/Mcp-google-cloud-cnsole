@@ -1,6 +1,6 @@
 # Approval workflow — internal primitives only
 
-**PARTIAL — implemented but not fully verified.** No production Google write operation can be called: no HTTP/MCP approval or execution endpoints are registered, and only read-only Google scopes are requested. There is no human approval UI/channel yet. Do not expose `ApprovalStore.decide` directly to an AI caller.
+**PARTIAL — implemented but not fully verified.** No production Google write operation can be called: no HTTP/MCP approval or execution endpoints are registered. Default Google scopes remain read-only; optional cloud-billing consent is only for the budget list tool and does not expose a mutation handler. There is no functioning human approval UI/channel yet. The deployed dashboard explicitly labels its approval section disabled, does not load a live pending list and does not fabricate approval IDs. Do not expose `ApprovalStore.decide` directly to an AI caller.
 
 ## What exists
 

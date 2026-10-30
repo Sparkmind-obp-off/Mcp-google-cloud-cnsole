@@ -1,5 +1,19 @@
 # Validation record
 
+## Current 0.3.0 execution and deployment evidence (supersedes older snapshots)
+
+- User explicitly approved the previously proposed initial migration and requested MainFunc push/deployment. Only 001_initial.sql was applied, at 2026-10-30T11:56:31.386Z, through the existing locked/checksummed transactional runner. Target neondb/public verified before apply. Remote checksum matches, public has 12 tables, nine neon_auth tables preserved. No application seed data or role changes were made; no unrelated migrations applied.
+- PASS: 42 automated tests, zero failures; development dry-run build; npm audit zero vulnerabilities. Sources scanned against actual uploaded secrets/DSN/password and Cloudflare token: zero matches. Credentials remain out of source/GitHub/Worker bindings.
+- PASS local protocol subset: native 2026-07-28 server/discover, ping, tools/list/call, per-request metadata/header mirroring, JSON-RPC errors/resultType, strict schema and legacy SDK paths. Actual external client connection remains unverified.
+- PARTIAL: opt-in project-exclusive budget list implemented and mock-tested; requires explicit cloud-billing grant/IAM/API, disabled on deployment. Browser voice dictation/speech adapter is explicit-click and never auto-invokes tools; simulated API tests pass, physical mic/provider test not run.
+- PASS: requested branch MainFunc created and application commit d24add4245b31bf26db2b5f338501c84207aa988 pushed. Main was not overwritten.
+- PASS: actual Cloudflare BYOK development Worker deployed: https://google-cloud-connector-development.sparkmind-support.workers.dev ; version 1f17e7b3-c06f-448d-92ca-7e77dbdf15bd, reported startup 44 ms, approximately 323 KiB gzip. Production Worker was not published.
+- PASS live checks: root/UI script/health/status 200, ready 503 CONFIGURATION_REQUIRED, metadata 503 AUTH_NOT_CONFIGURED, unconfigured MCP 503, untrusted-origin MCP 403, execution route 404. Health explicitly reports productionReady=false and writesEnabled=false.
+- PASS final browser load on deployed URL: correct title, voice-workspace selector found, zero console messages. Earlier sandbox browser timeout/expected readiness-resource 503 was not treated as a pass; absent-config readiness fetch was removed from the UI and the final deployed check passed.
+- BLOCKED: restricted runtime DB role/DSN, Google client/consent, external MCP issuer/JWKS and actual registered-user/client connection. Public Worker contains only nonsecret development vars, no administrative DSN or uploaded tokens. Onboarding status/workbench is implemented; provider login/registration, human approval UI and GCP write executor remain incomplete and inactive.
+
+All sections below are historical records; their earlier missing-migration/native-protocol/budget/voice/deployment observations are superseded above.
+
 Verified during 2026-10-30 implementation session. Baseline: `e898118` on the existing repository's main branch. This is a development release, NOT a production acceptance record.
 
 ## Follow-up live Neon verification

@@ -1,76 +1,74 @@
 # Google Cloud Console Connector
 
-Cloudflare Worker + Neon PostgreSQL connector for Google Cloud, with a stateless MCP read transport and a fail-closed write boundary.
+Cloudflare Worker + Neon PostgreSQL with independent MCP authentication, Google OAuth and a fail-closed Google write boundary.
 
-**Release: 0.2.0 development, NOT production-ready. No production deployment was performed.** Live Neon read-only connectivity is verified; its connector schema is not yet migrated. Google integration is implemented but not verified against live authorized accounts. All Google Cloud writes remain disabled. See [implementation status](docs/IMPLEMENTATION-STATUS.md).
+**0.3.0 development deployment is live. This is NOT a production-ready Google connection.** Google OAuth/MCP issuer configuration and a restricted runtime database role are not provisioned. No Google Cloud write executor is enabled.
 
-## Completed and verified locally
+## URLs and GitHub
 
-- Worker build, 25 automated tests, PostgreSQL schema/tenant constraints using isolated PGlite, MCP initialize/discovery/invocation using the official SDK.
-- Google OAuth state, PKCE S256, browser binding, ID-token issuer/audience/nonce validation, AES-256-GCM token storage, refresh compare-and-swap and revocation code; provider interactions tested with mocks.
-- Independent MCP JWT authentication via configured external authorization server, issuer/audience/expiry/scope verification, registered-user lookup.
-- Strict-schema read tools for projects/IAM, Compute, Cloud Run/revisions, Storage, Cloud SQL, bounded Logging and project billing association.
-- Approval persistence primitives, canonical payload/state hashes, expiry, atomic single-use claim and append-only audit triggers. These primitives are NOT exposed as approval/execution tools.
-- PostgreSQL migration tracking/checksums, advisory lock, transaction rollback and an explicit apply gate.
+- **Development Worker**: https://google-cloud-connector-development.sparkmind-support.workers.dev
+- **Health**: https://google-cloud-connector-development.sparkmind-support.workers.dev/health
+- **Readiness**: https://google-cloud-connector-development.sparkmind-support.workers.dev/ready — expected 503 until runtime prerequisites exist.
+- **Repository / requested branch**: https://github.com/Sparkmind-obp-off/Mcp-google-cloud-cnsole/tree/MainFunc
+- **Worker version**: `1f17e7b3-c06f-448d-92ca-7e77dbdf15bd` (application commit `d24add4245b31bf26db2b5f338501c84207aa988`).
+- Production Worker was not deployed. No custom domain was configured. `main` remains unchanged by the 0.3.0 branch work.
 
-## Run and verify
+## Verified results
 
-Requires Node.js 22+.
+- Approved Neon migration `001_initial.sql` applied at `2026-10-30T11:56:31.386Z`; remote checksum matches the committed file. **12 public tables** including tracking; existing **9 neon_auth tables preserved**. No users/project grants/application records seeded and no roles changed.
+- Live Neon HTTP and WebSocket connectivity verified. Database `neondb`, schema `public`, PostgreSQL 18.6. The provided administrative DSN was used in process memory only; it was not committed or installed on the public Worker.
+- **42 automated tests pass**, zero failures. Tests include real isolated PostgreSQL constraints, legacy SDK MCP, native MCP 2026 metadata/header/errors, budget scope/project isolation and browser voice adapters. Google API tests still use mocks.
+- Development Worker and JS asset return 200; public configuration status contains booleans only. `/ready` and unconfigured `/mcp` intentionally return 503; untrusted-origin MCP returns 403; write execution path returns 404.
+- Browser verification of the deployed dashboard loads with the correct title and **zero console messages**. No physical microphone/recognition-provider or actual Google account test is claimed.
+- Dependency audit reports zero vulnerabilities; live credential scan found no matches in committed project sources.
+
+## Completed implementation
+
+- Responsive Indonesian onboarding/status dashboard, read-only MCP workbench, secure Google consent start boundary and explicit disabled approval/executor state. The page never invents account/project data or approval IDs.
+- Native stateless **MCP 2026-07-28** subset: server/discover, ping, tools/list, tools/call, metadata and mirrored headers, resultType, JSON-RPC errors and notification acknowledgement. Legacy 2025-11-25/2025-06-18/2025-03-26 remain served by the official SDK. Optional streaming, subscriptions, sampling and elicitation are not advertised.
+- Project/IAM, Compute, Cloud Run/revisions, Storage, Cloud SQL, bounded Logging and project billing read tools with strict schemas and user/project authorization.
+- Opt-in project-scoped budget list tool. Default consent stays read-only; enabling budgets requires explicit `ENABLE_BUDGET_READ=true`, Google cloud-billing scope, billing.budgets.list and live consent. Account-wide/mixed-project budgets are excluded.
+- Browser voice dictation and speech synthesis behind explicit user clicks. Transcripts never trigger tools, approvals or writes. Browser/provider support varies; recognition may use a browser-provider service. No paid AI audio service is invoked.
+- OAuth state/PKCE/nonce, verified Google identity, contextual AES-GCM token encryption, refresh CAS and provider revoke; independent MCP JWT issuer/audience/expiry/scope/user validation.
+- Internal exact-payload approval primitives, immutable tenant bindings, five-minute expiry, atomic single-use claim and append-only audit/security event triggers. These are NOT a completed human-consent UI or executor.
+
+## Commands
+
+Node.js 22+ required.
 
 ```sh
 npm ci
 npm test
-npm run build                  # Cloudflare Worker dry-run; does not deploy
 npm audit
-npm run db:check               # Read-only; requires securely configured DATABASE_URL
-npm run release:check          # Expected exit 2 until all release gaps are implemented and verified
+npm run build                  # Production-config dry run only
+npm run build:development      # Development-config dry run only
+npm run db:check               # Read-only; requires securely supplied runtime environment
+npm run release:check          # Expected exit 2: production acceptance not passed
 ```
 
-Local preview uses `pm2 start ecosystem.config.cjs` after build, on port 3000. `/health` works without secrets; `/ready` intentionally returns 503 without complete configuration and a migrated database. The local preview is not a deployed Cloudflare Worker. No production URL currently exists.
+Local preview uses `pm2 start ecosystem.config.cjs` on port 3000 after build. Stop preview temporarily before PGlite tests on a low-memory sandbox. Never print secrets or put DSNs in command arguments. The approved migration has already been applied; do not reset, drop, edit its checksum or rerun unrelated DDL.
 
-Development health preview (temporary sandbox): https://3000-ivp9d07btcp0p55ymoi5g-3c7ff1b5.sandbox.novita.ai/health — verified HTTP 200. Its `/ready` endpoint returns the expected 503 because provider configuration is absent.
+## Functional paths
 
-## Functional entry URIs
-
-| Method | Path | Behavior |
+| Method | Path | Actual behavior |
 |---|---|---|
-| GET | `/health` | Public liveness, explicitly `productionReady:false`, no secret/config disclosure |
-| GET | `/ready` | 503 when configuration/database is unavailable; never claims production acceptance |
-| GET | `/.well-known/oauth-protected-resource` | Metadata pointing to an external MCP authorization server; no local token issuer |
-| POST | `/oauth/google/start` | Registered user's bearer JWT + exact APP_ORIGIN + JSON `{}`; sets HttpOnly binding cookie, returns Google authorization URL |
-| GET | `/oauth/google/callback?state=...&code=...` | Consumes state with binding cookie, validates identity, encrypts tokens; never returns tokens |
-| POST | `/connections/disconnect` | Same-origin bearer JWT + `{connectionId,confirm:"disconnect"}`; revokes at Google, then erases stored tokens |
-| POST | `/mcp` | Bearer JWT, JSON-RPC, Accept JSON and SSE; stateless SDK transport |
-
-Tool arguments and errors: [API reference](docs/API-REFERENCE.md). All GCP project reads require an administrator-selected project grant AND actual Google OAuth scopes/IAM/API access.
+| GET | `/` | Public onboarding/status, read workbench and optional browser voice UI |
+| GET | `/ui/app.js` | Same-origin UI script, no embedded secrets |
+| GET | `/api/status` | Configuration booleans and protocol capabilities, no DB query or secret values |
+| GET | `/health` | Liveness; productionReady=false, writesEnabled=false |
+| GET | `/ready` | 503 until full valid runtime config and migrated schema are reachable |
+| GET | `/.well-known/oauth-protected-resource` | External MCP authorization-server metadata when configured |
+| POST | `/oauth/google/start` | Registered MCP bearer + same-origin JSON; browser-bound PKCE consent URL |
+| GET | `/oauth/google/callback` | One-time state + browser binding + Google identity validation; tokens never returned |
+| POST | `/connections/disconnect` | Same-origin bearer and explicit disconnect confirmation; provider revoke then token erasure |
+| POST | `/mcp` | Independent authenticated MCP, both protocol eras; currently fails closed on deployed missing config |
 
 ## Architecture and storage
 
-- Primary database: **Neon PostgreSQL**, using the Neon HTTP serverless driver. No D1 or secondary database.
-- `database/migrations/001_initial.sql`: UUIDs, tenant-composite FKs, timestamptz, all ten required tables plus persistent rate counters.
-- Credentials are supplied through Worker secrets, never in the tracked Wrangler config. S3 and AI Gateway credentials are not database credentials and are not runtime dependencies of this connector.
-- Google access and refresh tokens are encrypted with contextual AES-GCM; the encryption key remains outside the database.
-- The original plugin package is retained, but it is NOT an installable/verified ChatGPT connection.
+Only Neon PostgreSQL is the database of record. Required models: users, oauth_connections, oauth_states, projects, project_permissions, pending_operations, approval_records, audit_events, security_events, connector_settings; plus rate_limits and schema_migrations. Tenant predicates and composite FKs are implemented; no deployed RLS claim is made. Tokens are AES-GCM encrypted with a Worker secret key outside the DB. S3/AI Gateway credentials are not dependencies of Google OAuth or this MCP runtime.
 
-## Not implemented / not verified
+## Remaining work / recommended next steps
 
-- Approved Neon migration, restricted runtime database role/secret binding, live Google OAuth/refresh/revoke, real Google API reads, actual MCP client connection. Live Neon HTTP/WebSocket connectivity is verified: neondb/public, PostgreSQL 18.6, no connector tables present.
-- Native latest MCP 2026 request-metadata protocol; installed SDK supports negotiated revisions through 2025-11-25.
-- Human approval UI/authorization channel, Google write executor, Cloud Run/bucket writes, budget reads, voice functionality.
-- Built-in MCP authorization server, browser login/onboarding UI, automated user/project administration, production release approval.
+Provision a restricted runtime role and bind only its DSN; configure Google client/redirect and independent MCP issuer/JWKS/audience; register test users/project grants through approved administration; verify real Google consent/refresh/revoke and actual MCP-client reads. Implement separately authenticated human confirmation plus audited, state-revalidated executor before enabling any Google write. Production WAF/retention/recovery/key-rotation reviews and real browser voice device checks remain outstanding. No broad 'finish everything' instruction authorizes arbitrary GCP production mutations.
 
-## Recommended next steps
-
-1. Rotate secrets previously shared in chat; provision Neon connection and Google/external MCP OAuth secrets securely.
-2. Read-only Neon connectivity is verified. Obtain explicit approval for the initial migration on neondb/public; preserve existing neon_auth tables and separately approve/provision a restricted runtime role. The supplied administrative role is too broad for runtime.
-3. Configure external MCP OAuth authorization server, provision registered users and project allowlists, complete live Google consent and read tests on an isolated project.
-4. Add independently authenticated human approval and verified write execution, then run controlled tests before any production release.
-5. Review and approve the exact Worker deployment only after release gates pass.
-
-## Repository and deployment
-
-- GitHub: https://github.com/Sparkmind-obp-off/Mcp-google-cloud-cnsole
-- Branch: `main`.
-- Backend target: existing **Cloudflare Workers** architecture in the user's own account (BYOK), not a new Pages app.
-- Cloudflare authentication was verified; the target Worker did not exist during inspection. No Worker, bucket, database or GCP resource was created/modified remotely.
-- Setup: [Google OAuth](docs/GOOGLE-OAUTH-SETUP.md), [Neon](docs/NEON-DATABASE-SETUP.md), [Cloudflare](docs/CLOUDFLARE-DEPLOYMENT.md), [MCP](docs/MCP-INTEGRATION.md), [security](docs/SECURITY.md), [testing](docs/TESTING.md).
+See [implementation status](docs/IMPLEMENTATION-STATUS.md), [validation](VALIDATION.md), [Neon](docs/NEON-DATABASE-SETUP.md), [deployment](docs/CLOUDFLARE-DEPLOYMENT.md), [MCP](docs/MCP-INTEGRATION.md), [API](docs/API-REFERENCE.md), [OAuth](docs/GOOGLE-OAUTH-SETUP.md), [approval](docs/APPROVAL-WORKFLOW.md), [security](docs/SECURITY.md) and [tests](docs/TESTING.md).
