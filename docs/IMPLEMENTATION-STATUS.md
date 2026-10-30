@@ -16,7 +16,8 @@ Baseline `e898118`, main clean/synchronized. All existing tracked files inspecte
 | Local security/integration suite | PASS — Verified working. | 25 tests, zero failures; PGlite and mocked Google as documented |
 | Dependency audit | PASS — Verified working. | npm audit reports zero vulnerabilities |
 | Neon primary store/schema/migration runner | PARTIAL — Implemented but not fully verified. | Actual schema and constraints execute in embedded PostgreSQL; no D1 |
-| Live Neon connectivity/migration | BLOCKED — Requires external configuration or access. | DATABASE_URL missing; no remote DB changes |
+| Live Neon connectivity | PASS — Verified working. | In-memory uploaded credentials connected via HTTP and WebSocket; neondb/public, PostgreSQL 18.6, read-only enforced |
+| Neon production migration/runtime role | BLOCKED — Requires external configuration or access. | Zero public tables and no tracker; explicit migration approval required. Provided role has CREATEDB/CREATEROLE/BYPASSRLS; restricted runtime role and secret binding not provisioned |
 | Google OAuth code, encryption, refresh/revoke | PARTIAL — Implemented but not fully verified. | Mock-provider and cryptographic tests pass |
 | Live Google authorization | BLOCKED — Requires external configuration or access. | Google client config, final URI and authorized account unavailable |
 | MCP JWT protected resource | PARTIAL — Implemented but not fully verified. | Signed JWT tests pass; external issuer and actual client not configured |
@@ -46,4 +47,4 @@ Baseline `e898118`, main clean/synchronized. All existing tracked files inspecte
 
 ## Remaining sequence / required actions
 
-Rotate previously shared credentials; securely configure Neon DSN, Google client and external MCP OAuth provider; approve exact DB migration target; implement a browser login/consent interface and register controlled users/projects; run live read tests and actual MCP client negotiation; implement independently authenticated human approval and audited state-revalidated executor; test each approved mutation on a controlled project; review production WAF/DB privileges/retention/key recovery; approve exact Worker production deploy and verify returned endpoints. Adding credentials alone is not sufficient to pass acceptance.
+Rotate previously shared credentials; retain/reuse the now-available uploaded Neon credentials without logging them; obtain explicit approval for the initial migration on neondb/public and separately provision a restricted runtime role/secret binding; configure Google client and external MCP OAuth provider; implement a browser login/consent interface and register controlled users/projects; run live read tests and actual MCP client negotiation; implement independently authenticated human approval and audited state-revalidated executor; test each approved mutation on a controlled project; review production WAF/DB privileges/retention/key recovery; approve exact Worker production deploy and verify returned endpoints. Adding credentials alone is not sufficient to pass acceptance.

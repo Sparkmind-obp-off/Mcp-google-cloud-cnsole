@@ -2,7 +2,7 @@
 
 Cloudflare Worker + Neon PostgreSQL connector for Google Cloud, with a stateless MCP read transport and a fail-closed write boundary.
 
-**Release: 0.2.0 development, NOT production-ready. No production deployment was performed.** Google/Neon integration is implemented but not verified against live authorized accounts. All Google Cloud writes remain disabled. See [implementation status](docs/IMPLEMENTATION-STATUS.md).
+**Release: 0.2.0 development, NOT production-ready. No production deployment was performed.** Live Neon read-only connectivity is verified; its connector schema is not yet migrated. Google integration is implemented but not verified against live authorized accounts. All Google Cloud writes remain disabled. See [implementation status](docs/IMPLEMENTATION-STATUS.md).
 
 ## Completed and verified locally
 
@@ -54,7 +54,7 @@ Tool arguments and errors: [API reference](docs/API-REFERENCE.md). All GCP proje
 
 ## Not implemented / not verified
 
-- Live Neon connection/migration, live Google OAuth/refresh/revoke, real Google API reads, actual MCP client connection.
+- Approved Neon migration, restricted runtime database role/secret binding, live Google OAuth/refresh/revoke, real Google API reads, actual MCP client connection. Live Neon HTTP/WebSocket connectivity is verified: neondb/public, PostgreSQL 18.6, no connector tables present.
 - Native latest MCP 2026 request-metadata protocol; installed SDK supports negotiated revisions through 2025-11-25.
 - Human approval UI/authorization channel, Google write executor, Cloud Run/bucket writes, budget reads, voice functionality.
 - Built-in MCP authorization server, browser login/onboarding UI, automated user/project administration, production release approval.
@@ -62,7 +62,7 @@ Tool arguments and errors: [API reference](docs/API-REFERENCE.md). All GCP proje
 ## Recommended next steps
 
 1. Rotate secrets previously shared in chat; provision Neon connection and Google/external MCP OAuth secrets securely.
-2. Obtain explicit approval for applying the migration to the exact Neon target; test read-only database connectivity first.
+2. Read-only Neon connectivity is verified. Obtain explicit approval for the initial migration on neondb/public; preserve existing neon_auth tables and separately approve/provision a restricted runtime role. The supplied administrative role is too broad for runtime.
 3. Configure external MCP OAuth authorization server, provision registered users and project allowlists, complete live Google consent and read tests on an isolated project.
 4. Add independently authenticated human approval and verified write execution, then run controlled tests before any production release.
 5. Review and approve the exact Worker deployment only after release gates pass.

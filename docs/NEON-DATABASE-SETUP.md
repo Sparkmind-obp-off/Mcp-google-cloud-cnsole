@@ -1,6 +1,8 @@
 # Neon PostgreSQL setup
 
-**Live connection: BLOCKED.** No `DATABASE_URL` was available. The provided S3 endpoint/access keys and AI Gateway token are different products, not PostgreSQL credentials. No Neon database or schema was created/changed remotely.
+**Live connection: PASS. Migration/runtime provisioning: BLOCKED pending explicit approval/configuration.** Credentials from the subsequent user upload successfully connected to `neondb` over both the Neon HTTP and WebSocket transports. Password/DSN were neither logged nor persisted into tracked files. Read-only inspection confirmed active schema `public`, PostgreSQL 18.6, zero tables in public and no migration tracker. Existing `neon_auth` contains nine tables; it was not modified. No Neon database/schema/data was created or changed.
+
+The supplied role is not a superuser but has CREATEDB, CREATEROLE and BYPASSRLS, plus schema creation rights. Use it only for reviewed administration/migrations, not as the Worker runtime role. A separate least-privilege runtime role and schema migration require explicit approval. Credentials remain available from the upload; do not ask the user to paste them again. Runtime DATABASE_URL has not yet been provisioned.
 
 ## Provision securely
 
@@ -28,6 +30,6 @@ Provisioning users and project grants is an administrator task through reviewed 
 
 No destructive down migration is provided. For failed uncommitted migrations rely on rollback; for applied schema defects use a reviewed forward migration. Back up before approved production changes and rehearse recovery on a Neon branch. Never edit an applied migration. Retention/expired-state/rate-counter cleanup and restore/key-rotation exercises remain operator tasks and unverified release requirements. Append-only event retention requires a separately reviewed administration process.
 
-Local tests execute the schema in PGlite (embedded PostgreSQL) and verify constraints, rollback, SQL approval races and audit writes. They do not demonstrate Neon network connectivity, production role permissions, distributed contention or disaster recovery.
+Local tests execute the schema in PGlite (embedded PostgreSQL) and verify constraints, rollback, SQL approval races and audit writes. Separate live read-only diagnostics now verify Neon connectivity, schema inventory and role capabilities. Production migration, connector-table permissions for a restricted runtime role, distributed contention and disaster recovery remain unverified.
 
 Reference: https://neon.com/docs/serverless/serverless-driver
